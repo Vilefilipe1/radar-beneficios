@@ -1,46 +1,39 @@
 from selenium import webdriver
-from bs4 import BeautifulSoup
-import time
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from src.scrapers.hapvida import *
+from src.scrapers.surpreenda import *
+from src.scrapers.github import *
 import pandas as pd
+import os
+from dotenv import load_dotenv
 
-driver = webdriver.Firefox()
-listaCompleta = []
+load_dotenv()
 
-def getHapvida():
-    driver.get('https://clube.hapvida.com.br/')
+firefox_options = FirefoxOptions()
+firefox_options.add_argument("--headless")
+driver = webdriver.Firefox(options=firefox_options)
 
-    time.sleep(2)
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
-    while (soup.find("button", string="Carregar mais parceiros") != None):
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(1)
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+REGIAO = os.getenv("REGIAO")
 
-    for item in soup.find_all("div", class_="item"):
-        nome = item.find("h4").span.text
-        beneficio = item.find("div", class_="discount").span.text
+def main():
+    regiao = "Sergipe"  # Região desejada
+    listaCompleta = []
 
-        listaCompleta.append({"Nome": nome, "Beneficio": beneficio, "Programa de Beneficios": "Hapvida"})
+    getHapvida(driver, listaCompleta, regiao)
+    getSurpreenda(driver, listaCompleta)
+    getGithub(driver, listaCompleta)
 
-def getSurpreenda():
-    driver.get('https://surpreenda.naotempreco.com.br/ofertas/')
+    driver.close()
 
-    time.sleep(2)
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
-    elementoGrupo = soup.find("ul", class_="c-btdZiW")
-    for item in elementoGrupo.find_all("li", class_="c-PJLV"):
-        nome = item.find("h3").text
-        beneficio = item.find("p").text
-        listaCompleta.append({"Nome": nome, "Beneficio": beneficio, "Programa de Beneficios": "Surpreenda"})
+    # print(listaCompleta)
+    # print(len(listaCompleta))
 
-# getHapvida()
-getSurpreenda()
-# print(listaCompleta)
-print(len(listaCompleta))
+    df = pd.DataFrame(listaCompleta)
+    df = df.sort_values("Nome")
+    df.reset_index(drop=True, inplace=True)
 
-driver.close()
+    df.to_csv("Ofertas.csv")
+    df.to_json("Ofertas.json", orient="records", force_ascii=False, indent=2)   
 
-df = pd.DataFrame(listaCompleta)
-df = df.sort_values("Nome")
-df.reset_index(drop=True, inplace=True)
-df.to_csv("Hapvida+Surpreenda.csv")
+if __name__ == "__main__":
+    main()
